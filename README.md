@@ -3,37 +3,36 @@
 
 A Discord bot for managing moderator shift coverage with:
 
-- Database-stored schedules (no hardcoded mod shifts)
+- Database-backed schedules (no hardcoded shifts)
 - DST-aware timezone support
 - Schedule management via slash commands
 - Fairness system to prevent shift hogging
-- Persistent "Claim shift" buttons that survive bot restarts :contentReference[oaicite:0]{index=0}
+- Persistent "Claim shift" buttons that survive bot restarts
+
+Built for deployment on services like Render with a managed PostgreSQL DB.
 
 ---
 
 ## Features
 
-- **Database-backed schedules**
-  - All moderator schedules are stored in the `mod_schedules` table.
-  - No hardcoded schedules; everything is editable via commands. :contentReference[oaicite:1]{index=1}
-
-- **DST-aware timezones**
-  - Schedules store an IANA timezone (e.g. `America/New_York`).
-  - Next-occurrence calculations use `ZoneInfo` and automatically handle DST transitions. 
-
+- **Database-stored schedules**
+  - Moderators configure their weekly schedule via commands; stored in `mod_schedules`.
 - **Shift lifecycle**
-  - Mods can drop shifts (generic or based on their schedule).
-  - Other mods can claim shifts via a persistent button.
-  - Shifts can be edited (if unclaimed) or cancelled. :contentReference[oaicite:3]{index=3}
-
-- **Fairness system**
-  - Tracks total hours claimed in the last 7 days.
-  - Users over the configured cap can only claim close to shift start. 
-
+  - Drop generic shifts or scheduled mod shifts.
+  - Other mods claim via a persistent button.
+  - Shifts can be edited (if unclaimed) or cancelled.
+- **Fairness / anti-hogging**
+  - Tracks hours claimed in the last 7 days.
+  - “Heavy” users can only claim when close to shift start.
+- **Timezone & DST aware**
+  - Each schedule slot stores an IANA timezone (e.g. `America/New_York`).
+  - Next-occurence calculation uses `ZoneInfo`, handles DST automatically.
 - **Role-based permissions**
-  - Everyone can view schedules and stats.
-  - Moderators manage their own schedule and shifts.
-  - Admins can manage any schedule/shift and sync commands. :contentReference[oaicite:5]{index=5}
+  - Everyone: view stats & schedules, claim shifts.
+  - Mods: manage their own schedules & shifts.
+  - Admins: manage any schedule/shift and sync commands.
+- **Persistent UI**
+  - Claim button is implemented as a persistent `discord.ui.View`, re-registered on startup.
 
 ---
 
@@ -41,11 +40,11 @@ A Discord bot for managing moderator shift coverage with:
 
 - **Language:** Python 3.10+
 - **Libraries:**
-  - `discord.py`
+  - `discord.py` 2.x
   - `psycopg2-binary`
   - `python-dotenv`
-  - `zoneinfo` (standard library, Python 3.9+) :contentReference[oaicite:6]{index=6}
-- **Database:** PostgreSQL (Neon, Supabase, Render managed, etc.)
+  - `zoneinfo` (standard library)
+- **Database:** PostgreSQL (Supabase, Neon, Render managed Postgres, etc.)
 
 Example `requirements.txt`:
 
@@ -59,70 +58,60 @@ python-dotenv>=1.0.0
 
 ## File Structure
 
-````text
+```text
 DISCORD BOT/
-├── bot.py              # Main bot (PostgreSQL, DST-aware)
+├── bot.py              # Main bot (PostgreSQL + DST-aware)
 ├── requirements.txt    # Dependencies
-└── DOCUMENTATION.md    # Technical details & command reference
-``` :contentReference[oaicite:7]{index=7}
+└── DOCUMENTATION.md    # Extended technical docs (schema, commands, workflows)
+```
 
 ---
 
 ## Configuration (in `bot.py`)
 
-Edit these values near the top of `bot.py`:
+At the top of `bot.py` there is a configuration section:
 
 ```python
-# The channel ID where shift commands can be used
-ALLOWED_CHANNEL_ID = 123456789012345678  # Replace with your channel ID
-
-# The role ID that can use moderator commands (drop shifts, cancel shifts)
-MOD_ROLE_ID = 123456789012345679         # Replace with your moderator role ID
-
-# The role ID that can use admin commands (sync commands, admin schedule mgmt)
-ADMIN_ROLE_ID = 123456789012345680       # Replace with your admin role ID
+# Discord / roles / channel
+ALLOWED_CHANNEL_ID = 1445805874382901388  # Channel where shift commands may be used
+MOD_ROLE_ID        = 1445982976809767002  # Moderator role ID
+ADMIN_ROLE_ID      = 1445985907093012561  # Admin role ID
 
 # Fairness settings
-MAX_HOURS_7D = 3.0                  # Max hours in last 7 days before being "heavy"
-HEAVY_LOCK_WINDOW_MINUTES = 60      # Heavy mods can only claim if <60 min before start
+MAX_HOURS_7D = 3.0                  # Max hours in last 7 days before user is "heavy"
+HEAVY_LOCK_WINDOW_MINUTES = 60      # Heavy mods can only claim if start < 60 min away
 
-# Duration limits
-MIN_DURATION_HOURS = 0.25           # Minimum 15 minutes
-MAX_DURATION_HOURS = 24.0           # Maximum 24 hours
+# Shift duration limits
+MIN_DURATION_HOURS = 0.25           # Min 15 minutes
+MAX_DURATION_HOURS = 24.0           # Max 24 hours
 
 # Default timezone for new schedules
 DEFAULT_TIMEZONE = "UTC"
-````
 
-**Summary:**
+# Admin schedule management
+RESTRICT_ADMIN_SCHEDULE_TO_CHANNEL = False
+```
 
-* `ALLOWED_CHANNEL_ID`
-  Channel where shift commands (`/drop_shift`, `/drop_mod_shift`, etc.) may be used.
-
-* `MOD_ROLE_ID`
-  Role allowed to manage their own schedules and shifts.
-
-* `ADMIN_ROLE_ID`
-  Role allowed to manage any schedule/shift and sync commands.
+On your own copy, replace those IDs with your server’s channel & role IDs.
 
 ---
 
 ## Environment Variables
 
-The bot expects:
+The bot uses environment variables (e.g. `.env` locally, dashboard on Render):
 
-| Variable        | Required | Description                  |
-| --------------- | -------- | ---------------------------- |
-| `DISCORD_TOKEN` | Yes      | Discord bot token            |
-| `DATABASE_URL`  | Yes      | PostgreSQL connection string |
+| Variable        | Required | Description                             |
+| --------------- | -------- | --------------------------------------- |
+| `DISCORD_TOKEN` | Yes      | Bot token from Discord Developer Portal |
+| `DATABASE_URL`  | Yes      | PostgreSQL connection string            |
 
-**Example connection string:**
+**Postgres connection string format:**
 
 ```text
 postgresql://user:password@host:port/database
 ```
 
-Local `.env` example:
+**Example `.env` for local development:**
 
 ```env
 DISCORD_TOKEN=your_discord_bot_token_here
@@ -133,9 +122,9 @@ DATABASE_URL=postgresql://user:password@localhost:5432/shifts
 
 ## Database Schema
 
-### Table: `shifts`
+### `shifts`
 
-Stores all dropped shifts and their state. 
+Stores all dropped shifts and their state.
 
 | Column             | Type               | Description                         |
 | ------------------ | ------------------ | ----------------------------------- |
@@ -152,9 +141,9 @@ Stores all dropped shifts and their state.
 | `claimed_at`       | TIMESTAMPTZ        | When claimed                        |
 | `cancelled`        | BOOLEAN            | Whether shift is cancelled          |
 
-### Table: `mod_schedules`
+### `mod_schedules`
 
-Stores weekly schedule slots per moderator.
+Stores weekly time slots per moderator.
 
 | Column        | Type               | Description            |
 | ------------- | ------------------ | ---------------------- |
@@ -166,7 +155,7 @@ Stores weekly schedule slots per moderator.
 | `timezone`    | TEXT DEFAULT 'UTC' | IANA timezone string   |
 | `created_at`  | TIMESTAMPTZ        | When slot was created  |
 
-Unique constraint: `(user_id, day_of_week, hour, minute)`.
+**Unique constraint:** `(user_id, day_of_week, hour, minute)`
 
 ---
 
@@ -174,42 +163,42 @@ Unique constraint: `(user_id, day_of_week, hour, minute)`.
 
 ### Schedule Management
 
-| Command               | Description                               | Who can use                  |   |
-| --------------------- | ----------------------------------------- | ---------------------------- | - |
-| `/schedule_add`       | Add a time slot to your own schedule      | Moderators                   |   |
-| `/schedule_add_admin` | Add a schedule slot for another moderator | Admins                       |   |
-| `/schedule_remove`    | Remove a slot from your own schedule      | Moderators                   |   |
-| `/schedule_view`      | View a user’s schedule                    | Anyone                       |   |
-| `/schedule_clear`     | Clear all slots for a user                | Self: Mods, Any user: Admins |   |
+| Command               | Description                               | Who can use                  |
+| --------------------- | ----------------------------------------- | ---------------------------- |
+| `/schedule_add`       | Add a time slot to **your** schedule      | Moderators                   |
+| `/schedule_add_admin` | Add a schedule slot for another moderator | Admins                       |
+| `/schedule_remove`    | Remove a time slot from **your** schedule | Moderators                   |
+| `/schedule_view`      | View a user’s schedule                    | Anyone                       |
+| `/schedule_clear`     | Clear all slots (self or another user)    | Self: Mods, Any user: Admins |
 
 ### Shift Commands
 
-| Command           | Description                                           | Who can use                         |   |
-| ----------------- | ----------------------------------------------------- | ----------------------------------- | - |
-| `/drop_shift`     | Post a generic shift with a claim button              | Moderators                          |   |
-| `/drop_mod_shift` | Drop a scheduled shift from a moderator’s schedule    | Mods (self), Admins (any moderator) |   |
-| `/shift_edit`     | Edit an unclaimed shift (time, duration, description) | Shift owner or Admin                |   |
-| `/shift_cancel`   | Cancel a shift (claimed or unclaimed)                 | Shift owner or Admin                |   |
-| `/shift_stats`    | View claimed shift count and total hours              | Anyone                              |   |
-| `/sync_commands`  | Manually sync slash commands with Discord             | Admins                              |   |
+| Command           | Description                                         | Who can use                        |
+| ----------------- | --------------------------------------------------- | ---------------------------------- |
+| `/drop_shift`     | Post a generic shift with a claim button            | Moderators                         |
+| `/drop_mod_shift` | Drop a scheduled shift from a moderator’s schedule  | Mods (own), Admins (any moderator) |
+| `/shift_edit`     | Edit an unclaimed shift (description/time/duration) | Shift owner or Admin               |
+| `/shift_cancel`   | Cancel a shift (claimed or unclaimed)               | Shift owner or Admin               |
+| `/shift_stats`    | View shift count & total claimed hours for a user   | Anyone                             |
+| `/sync_commands`  | Sync slash commands with Discord                    | Admins                             |
 
 ### Fallback Prefix Commands
 
-| Command | Description                 |   |
-| ------- | --------------------------- | - |
-| `!ping` | Check if bot is responsive  |   |
-| `!sync` | Sync slash commands (admin) |   |
+| Command | Description                    |
+| ------- | ------------------------------ |
+| `!ping` | Check if the bot is responsive |
+| `!sync` | Manually sync slash commands   |
 
 ---
 
 ## Fairness System
 
-To prevent one moderator from claiming all the shifts:
+To stop one mod from hoarding all the coverage:
 
-1. The bot sums up `duration_hours` for claimed, non-cancelled shifts in the last 7 days for each user.
-2. If `total_hours >= MAX_HOURS_7D`, the user is considered **heavy**.
-3. Heavy users can only claim shifts with start times within `HEAVY_LOCK_WINDOW_MINUTES` of now.
-4. Otherwise, the claim is blocked and the user gets an explanatory error.
+1. Bot sums `duration_hours` for **claimed, non-cancelled** shifts in the last 7 days for each user.
+2. If `total_hours >= MAX_HOURS_7D` (default: `3.0`), user is considered **heavy**.
+3. Heavy users can only claim shifts where the start time is within `HEAVY_LOCK_WINDOW_MINUTES` (default: 60) of now.
+4. If they try to claim earlier, the bot rejects the claim and shows their current total hours.
 
 ---
 
@@ -217,82 +206,111 @@ To prevent one moderator from claiming all the shifts:
 
 * Each schedule slot stores:
 
-  * `day_of_week` (0–6),
-  * `hour` / `minute`,
-  * `timezone` (IANA name).
-* The bot uses `ZoneInfo` to:
+  * `day_of_week` (0–6)
+  * `hour` / `minute`
+  * `timezone` (IANA name, e.g. `America/New_York`)
+* The bot:
 
-  * Get the current local time in that timezone.
-  * Calculate the **next** occurrence of that weekday/time.
-  * Convert it to UTC for storage and comparison.
-* DST transitions (EST↔EDT, etc.) are handled automatically; the moderator’s local time stays consistent.
+  * Converts "day/hour/minute in timezone" to the **next upcoming** datetime using `ZoneInfo`.
+  * Converts that to UTC for storage & comparison.
+* DST transitions (e.g. EST ↔ EDT) are handled automatically; the moderator’s local schedule stays consistent.
+
+Common timezones supported via autocomplete:
+
+* `UTC`
+* `America/New_York`
+* `America/Chicago`
+* `America/Denver`
+* `America/Los_Angeles`
+* `Europe/London`
+* `Europe/Paris`
+* `Asia/Tokyo`
+* `Australia/Sydney`
+
+Any valid IANA timezone works.
 
 ---
 
 ## Local Setup
 
-1. **Create virtual environment (optional but recommended)**
+1. **Clone / copy the files**
+
+   Put `bot.py`, `requirements.txt`, and `DOCUMENTATION.md` into a folder, e.g.:
+
+   ```text
+   DISCORD BOT/
+   ├── bot.py
+   ├── requirements.txt
+   └── DOCUMENTATION.md
+   ```
+
+2. **Create virtual environment (optional but recommended)**
 
    ```bash
    python -m venv .venv
    # Windows
    .venv\Scripts\activate
-   # macOS/Linux
+   # macOS / Linux
    source .venv/bin/activate
    ```
 
-2. **Install dependencies**
+3. **Install dependencies**
 
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Configure environment**
+4. **Set environment variables**
 
-   * Set `DISCORD_TOKEN` and `DATABASE_URL` in your environment, or
-   * Create a `.env` file next to `bot.py`:
+   Either export them in your shell or create a `.env` file:
 
-     ```env
-     DISCORD_TOKEN=your_discord_bot_token_here
-     DATABASE_URL=postgresql://user:password@host:5432/shifts
-     ```
+   ```env
+   DISCORD_TOKEN=your_discord_bot_token_here
+   DATABASE_URL=postgresql://user:password@localhost:5432/shifts
+   ```
 
-4. **Configure IDs in `bot.py`**
+5. **Configure IDs in `bot.py`**
 
-   * Set `ALLOWED_CHANNEL_ID`, `MOD_ROLE_ID`, `ADMIN_ROLE_ID`, and any fairness/timing settings.
+   * `ALLOWED_CHANNEL_ID`
+   * `MOD_ROLE_ID`
+   * `ADMIN_ROLE_ID`
+   * Any fairness / duration / timezone settings you want to change.
 
-5. **Run the bot**
+6. **Run the bot**
 
    ```bash
    python bot.py
    ```
 
-   On first startup, the bot will:
+   On startup, the bot will:
 
-   * Initialize the `shifts` and `mod_schedules` tables if they do not exist.
-   * Register the persistent `ShiftClaimView` for buttons.
+   * Initialize `shifts` and `mod_schedules` tables if they don’t exist.
+   * Register the persistent `ShiftClaimView` for the claim button.
+   * Log in as your bot user.
 
-6. **Sync slash commands**
+7. **Sync slash commands**
 
    In Discord, once the bot is online:
 
-   * Use `/sync_commands`, or
-   * Use `!sync` if you prefer prefix commands.
+   * Use `/sync_commands` (admin), or
+   * Use `!sync` if you prefer the prefix command.
 
-Slash commands may take a minute or two to fully appear.
+Slash commands may take 1–2 minutes to fully propagate in the client.
 
 ---
 
-## Deployment (Example: Render)
+## Deployment (e.g. Render + PostgreSQL)
 
 1. **Database**
 
-   * Provision a PostgreSQL database (e.g. Supabase, Neon, or Render’s managed Postgres).
-   * Copy the connection URL and use it as `DATABASE_URL`. 
+   * Create a PostgreSQL instance (Render, Supabase, Neon, etc.).
+   * Copy the **connection string** and use it as `DATABASE_URL`.
 
 2. **Web Service**
 
-   * Connect your GitHub repo to a new Web Service.
+   * Push your bot code to a Git repository (GitHub, etc.).
+
+   * Create a new Web Service and connect it to the repo.
 
    * Build command:
 
@@ -306,21 +324,22 @@ Slash commands may take a minute or two to fully appear.
      python bot.py
      ```
 
-   * Add environment variables:
+   * Environment variables:
 
      * `DISCORD_TOKEN=...`
      * `DATABASE_URL=...`
 
-3. Deploy. The bot should come online and start listening for slash/prefix commands.
+3. Deploy. The bot should come online and start responding in your server.
 
 ---
 
 ## License
 
 This bot is provided as-is for managing Discord moderator shifts.
-You are free to fork, modify, and adapt it for your own servers and workflows.
+You’re free to fork, modify, and adapt it for your own servers.
 
 ```
 
-::contentReference[oaicite:19]{index=19}
+Cram that into your repo, commit, and go back to bullying your schedule spreadsheet into submission. 
+::contentReference[oaicite:1]{index=1}
 ```
