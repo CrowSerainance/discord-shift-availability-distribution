@@ -85,6 +85,7 @@ DEFAULT_TIMEZONE = "UTC"            # Default timezone for new schedules
 | Command | Description | Who Can Use |
 |---------|-------------|-------------|
 | `/schedule_add` | Add a time slot to your schedule | Moderators |
+| `/schedule_add_admin` | Add a schedule slot for a moderator | Admins |
 | `/schedule_remove` | Remove a time slot | Moderators |
 | `/schedule_view` | View a user's schedule | Anyone |
 | `/schedule_clear` | Clear all slots | Moderators (own), Admins (any) |
@@ -162,7 +163,7 @@ Prevents one person from claiming too many shifts.
 
 1. **Everyone:** View schedules, view stats, claim shifts
 2. **Moderators (MOD_ROLE_ID):** Drop shifts, edit own shifts, manage own schedule
-3. **Admins (ADMIN_ROLE_ID):** Drop any shift, edit any shift, clear any schedule, sync commands
+3. **Admins (ADMIN_ROLE_ID):** Drop any shift, edit any shift, add/clear any schedule, sync commands
 
 ---
 
@@ -344,13 +345,81 @@ The `/shift_edit` command allows moderators and admins to modify shift details *
 
 ---
 
+## Admin Schedule Management
+
+### Overview
+
+Admins have additional capabilities to manage moderator schedules, allowing for centralized schedule management and easier onboarding of new moderators.
+
+### Admin-Only Commands
+
+#### `/schedule_add_admin`
+
+Allows admins to add schedule slots for any moderator.
+
+**Parameters:**
+- `user` - The moderator to add the schedule for (required)
+- `day` - Day of the week (Monday-Sunday)
+- `hour` - Hour in 24-hour format (0-23)
+- `minute` - Minute (0-59, default 0)
+- `timezone` - IANA timezone (e.g., `America/New_York`)
+
+**Use Cases:**
+- **Onboarding:** Quickly set up schedules for new moderators
+- **Bulk Management:** Add multiple time slots efficiently
+- **Standardization:** Ensure consistent schedule formatting
+- **Temporary Coverage:** Add schedules when moderators are unavailable
+
+**Example Usage:**
+```
+/schedule_add_admin user:@Alice day:Monday hour:14 minute:0 timezone:America/New_York
+/schedule_add_admin user:@Bob day:Wednesday hour:20 timezone:Europe/London
+```
+
+**Notes:**
+- Admins can add schedules for any user, not just moderators
+- The same validation applies (no duplicate slots, valid timezone, etc.)
+- Moderators can still manage their own schedules using `/schedule_add`
+- If a slot already exists, the command will inform you
+
+#### `/schedule_clear` (Admin Mode)
+
+Admins can clear any moderator's schedule by specifying the user:
+```
+/schedule_clear user:@ModeratorName
+```
+
+### Workflow Example
+
+**Scenario:** Adding a new moderator with a weekly schedule
+
+1. Admin uses `/schedule_add_admin` multiple times:
+   ```
+   /schedule_add_admin user:@NewMod day:Monday hour:9 timezone:America/New_York
+   /schedule_add_admin user:@NewMod day:Wednesday hour:9 timezone:America/New_York
+   /schedule_add_admin user:@NewMod day:Friday hour:9 timezone:America/New_York
+   ```
+
+2. Verify with `/schedule_view user:@NewMod`
+
+3. The moderator can now use `/drop_mod_shift` to drop their scheduled shifts
+
+---
+
 ## Common Tasks
 
 ### Add a New Moderator
 
+**Option 1: Moderator adds their own schedule**
 1. Have them use `/schedule_add` to add their time slots
 2. They select day, hour, minute, and timezone
 3. DST is handled automatically
+
+**Option 2: Admin adds schedule for moderator**
+1. Admin uses `/schedule_add_admin` 
+2. Select the moderator, day, hour, minute, and timezone
+3. The schedule is added automatically
+4. Useful for bulk setup or when moderators are unavailable
 
 ### Remove a Moderator
 
@@ -364,6 +433,22 @@ Edit `ALLOWED_CHANNEL_ID` in bot.py (replace with your channel ID) and redeploy.
 ### Change Role Requirements
 
 Edit `MOD_ROLE_ID` and `ADMIN_ROLE_ID` in bot.py (replace with your role IDs) and redeploy.
+
+### Add Schedule for a Moderator (Admin)
+
+1. Use `/schedule_add_admin` and select the moderator
+2. Choose the day, hour, minute, and timezone
+3. The schedule slot is added to their schedule
+4. Useful for:
+   - Setting up new moderators quickly
+   - Bulk schedule management
+   - When moderators are temporarily unavailable
+   - Standardizing schedules across the team
+
+**Example:**
+```
+/schedule_add_admin user:@ModeratorName day:Monday hour:14 timezone:America/New_York
+```
 
 ### Edit a Shift
 
@@ -444,6 +529,7 @@ If upgrading from an older version, the `mod_schedules` table is created automat
 
 **For Admins:**
 - All moderator commands, plus:
+- `/schedule_add_admin @user` - Add schedule slots for any moderator
 - `/schedule_clear @user` - Clear anyone's schedule
 - `/drop_mod_shift` with any user - Drop shifts for any moderator
 - `/shift_edit` - Edit any unclaimed shift

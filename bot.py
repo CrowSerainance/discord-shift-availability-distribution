@@ -1116,6 +1116,91 @@ async def schedule_view(
 
 
 @bot.tree.command(
+    name="schedule_add_admin",
+    description="Add a schedule slot for a moderator (admin only).",
+)
+@app_commands.describe(
+    user="Moderator to add schedule for.",
+    day="Day of the week.",
+    hour="Hour (0-23).",
+    minute="Minute (0-59, default 0).",
+    timezone="Timezone (e.g., America/New_York). Handles DST automatically.",
+)
+@app_commands.choices(day=[
+    app_commands.Choice(name="Monday", value=0),
+    app_commands.Choice(name="Tuesday", value=1),
+    app_commands.Choice(name="Wednesday", value=2),
+    app_commands.Choice(name="Thursday", value=3),
+    app_commands.Choice(name="Friday", value=4),
+    app_commands.Choice(name="Saturday", value=5),
+    app_commands.Choice(name="Sunday", value=6),
+])
+async def schedule_add_admin(
+    interaction: discord.Interaction,
+    user: discord.Member,
+    day: int,
+    hour: int,
+    timezone: str = DEFAULT_TIMEZONE,
+    minute: int = 0,
+):
+    if not has_admin_role(interaction.user):
+        await interaction.response.send_message(
+            "You need administrator permissions to use this command.",
+            ephemeral=True,
+        )
+        return
+
+    # Validate inputs
+    if not (0 <= hour <= 23):
+        await interaction.response.send_message("Hour must be between 0 and 23.", ephemeral=True)
+        return
+    if not (0 <= minute <= 59):
+        await interaction.response.send_message("Minute must be between 0 and 59.", ephemeral=True)
+        return
+
+    # Validate timezone
+    try:
+        tz = ZoneInfo(timezone)
+        offset_display = get_utc_offset_display(timezone)
+    except Exception:
+        await interaction.response.send_message(
+            f"Invalid timezone: `{timezone}`\n"
+            f"Use a valid IANA timezone like `America/New_York` or `Europe/London`.",
+            ephemeral=True,
+        )
+        return
+
+    success, message = add_schedule_slot(user.id, day, hour, minute, timezone)
+
+    if success:
+        slot_display = format_slot_for_display(day, hour, minute, timezone)
+        await interaction.response.send_message(
+            f"Added to {user.mention}'s schedule: **{slot_display}**\n"
+            f"Current offset: {offset_display} (adjusts automatically for DST)",
+            ephemeral=True,
+        )
+    else:
+        await interaction.response.send_message(
+            f"Could not add slot: {message}",
+            ephemeral=True,
+        )
+
+
+@schedule_add_admin.autocomplete("timezone")
+async def schedule_add_admin_timezone_autocomplete(interaction: discord.Interaction, current: str):
+    """Autocomplete for timezone parameter in admin schedule add."""
+    choices = []
+    current_lower = current.lower()
+
+    for tz in COMMON_TIMEZONES:
+        if current_lower in tz.lower():
+            offset = get_utc_offset_display(tz)
+            choices.append(app_commands.Choice(name=f"{tz} ({offset})", value=tz))
+
+    return choices[:25]
+
+
+@bot.tree.command(
     name="schedule_clear",
     description="Clear all slots from your schedule.",
 )
