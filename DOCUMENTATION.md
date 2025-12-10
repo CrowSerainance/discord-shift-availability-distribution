@@ -60,7 +60,7 @@ DISCORD BOT/
 
 ## Configuration
 
-Edit these values in `bot.py` (lines 68-86):
+Edit these values in `bot.py` (lines 68-89):
 
 ```python
 ALLOWED_CHANNEL_ID = YOUR_CHANNEL_ID_HERE      # Channel for shift commands
@@ -74,6 +74,8 @@ MIN_DURATION_HOURS = 0.25           # Minimum shift duration
 MAX_DURATION_HOURS = 24.0           # Maximum shift duration
 
 DEFAULT_TIMEZONE = "UTC"            # Default timezone for new schedules
+
+RESTRICT_ADMIN_SCHEDULE_TO_CHANNEL = False  # Restrict /schedule_add_admin to ALLOWED_CHANNEL_ID
 ```
 
 ---
@@ -350,6 +352,12 @@ The `/shift_edit` command allows moderators and admins to modify shift details *
 ### Overview
 
 Admins have additional capabilities to manage moderator schedules, allowing for centralized schedule management and easier onboarding of new moderators.
+
+### Security & Restrictions
+
+- **Admin Only:** Requires `ADMIN_ROLE_ID` to use
+- **Moderator Validation:** Only allows adding schedules for users with `MOD_ROLE_ID`
+- **Channel Restriction:** Optional - set `RESTRICT_ADMIN_SCHEDULE_TO_CHANNEL = True` in `bot.py` to restrict usage to `ALLOWED_CHANNEL_ID` (default: `False`, can be used in any channel)
 
 ### Admin-Only Commands
 

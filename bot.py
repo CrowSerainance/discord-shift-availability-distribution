@@ -85,6 +85,10 @@ MAX_DURATION_HOURS = 24.0  # Maximum 24 hours
 # Default timezone for new schedules (can be changed per-user)
 DEFAULT_TIMEZONE = "UTC"
 
+# Admin schedule management settings
+# Set to True to restrict /schedule_add_admin to ALLOWED_CHANNEL_ID only
+RESTRICT_ADMIN_SCHEDULE_TO_CHANNEL = False
+
 
 # ==============================================================================
 # LOGGING SETUP
@@ -1146,6 +1150,22 @@ async def schedule_add_admin(
     if not has_admin_role(interaction.user):
         await interaction.response.send_message(
             "You need administrator permissions to use this command.",
+            ephemeral=True,
+        )
+        return
+
+    # Optional: Restrict to specific channel (configured above)
+    if RESTRICT_ADMIN_SCHEDULE_TO_CHANNEL and interaction.channel.id != ALLOWED_CHANNEL_ID:
+        await interaction.response.send_message(
+            f"This command can only be used in <#{ALLOWED_CHANNEL_ID}>.",
+            ephemeral=True,
+        )
+        return
+
+    # Validate that target user has moderator role
+    if not has_mod_role(user):
+        await interaction.response.send_message(
+            f"{user.mention} does not have the moderator role. You can only add schedules for moderators.",
             ephemeral=True,
         )
         return
