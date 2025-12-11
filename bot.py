@@ -37,6 +37,8 @@ SETUP INSTRUCTIONS:
 """
 
 import os
+from flask import Flask
+from threading import Thread
 import psycopg2
 import logging
 from datetime import datetime, timedelta, timezone
@@ -54,6 +56,22 @@ try:
 except ImportError:
     pass  # dotenv not installed, assume env vars are set directly
 
+# --- FLASK KEEP ALIVE SECTION ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "I am alive and the bot is running!"
+
+def run():
+    # Important: Render sets the PORT env var. We must listen on it.
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+# -------------------------------
 
 # ==============================================================================
 # CONFIGURATION SECTION
@@ -1953,8 +1971,9 @@ async def sync(ctx):
 # MAIN ENTRY POINT
 # ==============================================================================
 
-
 if __name__ == "__main__":
+    # 1. Check for Token (Do NOT paste the real token here!)
+    # It must stay exactly like this:
     if not TOKEN:
         logger.error("ERROR: DISCORD_TOKEN not set!")
         exit(1)
@@ -1963,6 +1982,7 @@ if __name__ == "__main__":
         logger.error("ERROR: DATABASE_URL not set!")
         exit(1)
 
+    # 2. Initialize Database
     try:
         init_db()
     except psycopg2.Error as e:
@@ -1971,8 +1991,12 @@ if __name__ == "__main__":
 
     logger.info("Starting bot...")
 
+    # 3. Start the Keep-Alive Server (Flask)
+    keep_alive()
+
+    # 4. Run the Bot
     try:
-        bot.run(TOKEN)
+        bot.run(TOKEN)  # We use 'bot', not 'client'
     except discord.LoginFailure:
         logger.error("Invalid bot token!")
     except Exception as e:
